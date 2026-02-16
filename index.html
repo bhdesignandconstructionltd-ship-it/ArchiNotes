@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArchiNotes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                emeraldArch: '#50C878',
+                appBg: 'var(--app-bg)',
+                sidebarBg: 'var(--sidebar-bg)',
+                cardBg: 'var(--card-bg)',
+                textMain: 'var(--text-main)',
+                textMuted: 'var(--text-muted)',
+                borderMain: 'var(--border-main)',
+                blackBase: 'var(--app-bg)', // Keep compatibility with existing code
+              },
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+                mono: ['JetBrains+Mono', 'monospace'],
+              }
+            }
+          }
+        }
+    </script>
+    <style>
+        :root {
+            /* Night Mode (Default) */
+            --app-bg: #282828;
+            --sidebar-bg: #1e1e1e;
+            --card-bg: #333333;
+            --text-main: #e5e5e5;
+            --text-muted: #a3a3a3;
+            --border-main: #404040;
+            transition: all 0.25s ease-in-out;
+        }
+
+        [data-theme='day'] {
+            --app-bg: #F5F5F5;
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666666;
+            --border-main: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--app-bg);
+            color: var(--text-main);
+        }
+        .mono { font-family: 'JetBrains+Mono', monospace; }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-main);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #50C878;
+        }
+        .pdf-export-mode * {
+          border-color: #e5e7eb !important;
+          color: #000 !important;
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "jspdf": "https://esm.sh/jspdf@2.5.1",
+    "html2canvas": "https://esm.sh/html2canvas@1.4.1"
+  }
+}
+</script>
+</head>
+<body class="overflow-hidden">
+    <div id="root"></div>
+</body>
+</html>

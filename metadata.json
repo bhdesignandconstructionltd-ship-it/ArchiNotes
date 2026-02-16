@@ -1,0 +1,7 @@
+{
+  "name": "ArchiNotes - Architect Design Meeting Tool",
+  "description": "A specialized note-taking application for architects featuring group-based meeting organization, dual-column workspace for discussion and follow-ups, and an advanced image markup suite.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
