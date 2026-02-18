@@ -31,7 +31,6 @@ const App: React.FC = () => {
   
   const [activeProjectId, setActiveProjectId] = useState<string>(projects[0]?.id || '');
   const [activeMeetingId, setActiveMeetingId] = useState<string>(projects[0]?.meetings[0]?.id || '');
-  // Track which project groups are 'open' (expanded) in the sidebar
   const [expandedProjectIds, setExpandedProjectIds] = useState<string[]>([projects[0]?.id || '']);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
@@ -39,16 +38,15 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [theme, setTheme] = useState<'day' | 'night'>(() => {
     const savedTheme = localStorage.getItem('archi_theme');
-    return (savedTheme as 'day' | 'night') || 'night';
+    // Default to 'day' if no theme is saved
+    return (savedTheme as 'day' | 'night') || 'day';
   });
 
-  // Apply theme to document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('archi_theme', theme);
   }, [theme]);
 
-  // Auto-save to LocalStorage
   useEffect(() => {
     localStorage.setItem('archi_notes_v1', JSON.stringify(projects));
   }, [projects]);
@@ -56,7 +54,6 @@ const App: React.FC = () => {
   const activeProject = projects.find(p => p.id === activeProjectId);
   const activeMeeting = activeProject?.meetings.find(m => m.id === activeMeetingId);
 
-  // Get recently edited meetings across all projects
   const recentMeetings = useMemo(() => {
     const allMeetings = projects.flatMap(p => 
       p.meetings.map(m => ({ ...m, projectId: p.id }))
@@ -68,14 +65,12 @@ const App: React.FC = () => {
 
   const filteredProjects = useMemo(() => {
     if (!searchTerm.trim()) return projects;
-
     const term = searchTerm.toLowerCase();
     return projects.map(project => {
       const projectMatches = project.name.toLowerCase().includes(term);
       const matchingMeetings = project.meetings.filter(m => 
         m.name.toLowerCase().includes(term)
       );
-
       if (projectMatches) return project;
       if (matchingMeetings.length > 0) return { ...project, meetings: matchingMeetings };
       return null;
@@ -127,7 +122,7 @@ const App: React.FC = () => {
   };
 
   const deleteGroup = (id: string) => {
-    if (confirm('Delete this project and all its meetings?')) {
+    if (confirm('Delete this project group?')) {
       setProjects(prev => prev.filter(p => p.id !== id));
       if (activeProjectId === id) {
         setActiveProjectId('');
@@ -147,144 +142,87 @@ const App: React.FC = () => {
       }
   };
 
-  const closeActiveMeeting = () => {
-    setActiveMeetingId('');
-  };
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'night' ? 'day' : 'night');
-  };
+  const closeActiveMeeting = () => setActiveMeetingId('');
+  const toggleTheme = () => setTheme(prev => prev === 'night' ? 'day' : 'night');
 
   return (
     <div className="flex h-screen w-full bg-appBg overflow-hidden text-textMain">
-      {/* Sidebar: Project Groups (The Group Navigator) */}
-      <aside className={`bg-sidebarBg border-r border-borderMain transition-all duration-300 flex flex-col z-30 ${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden border-none'}`}>
-        <div className="p-6 border-b border-borderMain flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-textMain overflow-hidden">
-            <Layout className="shrink-0 text-emeraldArch" size={24} />
-            <h1 className="font-bold text-xl tracking-tight whitespace-nowrap">ArchiNotes</h1>
+      {/* Sidebar */}
+      <aside className={`bg-sidebarBg transition-all duration-300 flex flex-col z-30 ${sidebarOpen ? 'w-80' : 'w-0 overflow-hidden'}`}>
+        <div className="p-8 flex items-center justify-between">
+          <div className="flex items-center space-x-3 overflow-hidden">
+            <div className="p-2 nm-raised rounded-xl text-emeraldArch">
+               <Layout size={20} />
+            </div>
+            <h1 className="font-black text-xl tracking-tight whitespace-nowrap uppercase">ArchiNotes</h1>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="text-textMuted hover:text-emeraldArch transition-colors p-1 rounded-lg">
-            <X size={20} />
+          <button onClick={() => setSidebarOpen(false)} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch transition-colors">
+            <X size={18} />
           </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="px-4 pt-4 pb-2">
-          <div className="relative group">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textMuted group-focus-within:text-emeraldArch transition-colors" />
+        {/* Search */}
+        <div className="px-6 mb-6">
+          <div className="nm-inset rounded-2xl flex items-center px-4 py-2 group">
+            <Search size={16} className="text-textMuted mr-3 group-focus-within:text-emeraldArch transition-colors" />
             <input 
               type="text"
-              placeholder="Search project logs..."
+              placeholder="Search logs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-appBg text-textMain text-sm pl-10 pr-4 py-2 rounded-lg border border-borderMain focus:outline-none focus:border-emeraldArch transition-all placeholder:text-textMuted/50"
+              className="w-full bg-transparent text-sm focus:outline-none placeholder:text-textMuted/50"
             />
-            {searchTerm && (
-              <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-textMuted hover:text-textMain">
-                <X size={14} />
-              </button>
-            )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-2 mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-textMuted">Project Groups</span>
-              <button 
-                onClick={createGroup}
-                className="p-1 hover:bg-appBg rounded-md text-textMuted hover:text-emeraldArch transition-colors"
-                title="Create New Group"
-              >
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto px-6 space-y-8 scrollbar-hide">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-textMuted">Navigator</span>
+              <button onClick={createGroup} className="nm-btn p-1 rounded-lg text-textMuted hover:text-emeraldArch">
                 <Plus size={16} />
               </button>
             </div>
             
-            <div className="space-y-1">
-              {filteredProjects.length === 0 && (
-                <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-textMuted italic">No matches found</p>
-                </div>
-              )}
+            <div className="space-y-3">
               {filteredProjects.map(project => (
-                <div key={project.id} className="space-y-1">
+                <div key={project.id} className="space-y-2">
                   <div 
-                    className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-all ${activeProjectId === project.id ? 'bg-appBg/50 border-l-2 border-emeraldArch' : 'hover:bg-appBg'}`}
+                    className={`nm-btn group flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer ${activeProjectId === project.id ? 'nm-btn-active' : ''}`}
                     onClick={() => {
                         setActiveProjectId(project.id);
                         toggleProjectExpansion(project.id);
                     }}
-                    onDoubleClick={() => setRenamingGroupId(project.id)}
                   >
                     <div className="flex items-center space-x-3 overflow-hidden flex-1">
-                      {expandedProjectIds.includes(project.id) ? (
-                        <ChevronDown size={14} className="text-textMuted shrink-0" />
-                      ) : (
-                        <ChevronRight size={14} className="text-textMuted shrink-0" />
-                      )}
-                      <Folder size={18} className={activeProjectId === project.id ? 'text-emeraldArch' : 'text-textMuted'} />
-                      {renamingGroupId === project.id ? (
-                        <input 
-                          autoFocus
-                          value={project.name}
-                          onChange={(e) => setProjects(prev => prev.map(p => p.id === project.id ? { ...p, name: e.target.value } : p))}
-                          onBlur={() => setRenamingGroupId(null)}
-                          onKeyDown={(e) => e.key === 'Enter' && setRenamingGroupId(null)}
-                          className="bg-cardBg text-textMain px-1 border-b border-emeraldArch outline-none w-full"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span className={`truncate text-sm font-semibold ${activeProjectId === project.id ? 'text-textMain' : 'text-textMuted'}`}>
-                            {project.name}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                      <button onClick={(e) => { e.stopPropagation(); setRenamingGroupId(project.id); }} className="hover:text-emeraldArch p-1"><Edit3 size={14} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteGroup(project.id); }} className="hover:text-red-500 p-1"><Trash2 size={14} /></button>
+                      {expandedProjectIds.includes(project.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span className={`truncate text-sm font-bold ${activeProjectId === project.id ? 'text-emeraldArch' : ''}`}>
+                          {project.name}
+                      </span>
                     </div>
                   </div>
                   
                   {expandedProjectIds.includes(project.id) && (
-                    <div className="ml-6 border-l border-borderMain pl-4 space-y-1 animate-in slide-in-from-top-1 duration-200">
+                    <div className="ml-4 space-y-2 animate-in slide-in-from-top-1 duration-200">
                       {project.meetings.map(meeting => (
                         <div 
                           key={meeting.id}
-                          className={`group flex items-center justify-between py-1.5 px-3 rounded-md cursor-pointer text-xs transition-colors ${activeMeetingId === meeting.id ? 'bg-emeraldArch/10 text-emeraldArch font-bold' : 'text-textMuted hover:text-textMain hover:bg-appBg'}`}
+                          className={`flex items-center justify-between py-2 px-4 rounded-xl cursor-pointer text-xs font-bold transition-all ${activeMeetingId === meeting.id ? 'nm-inset text-emeraldArch' : 'text-textMuted hover:text-textMain'}`}
                           onClick={() => {
                               setActiveMeetingId(meeting.id);
                               setActiveProjectId(project.id);
                           }}
-                          onDoubleClick={() => setRenamingMeetingId(meeting.id)}
                         >
-                          <div className="flex-1 overflow-hidden">
-                            {renamingMeetingId === meeting.id ? (
-                                <input 
-                                  autoFocus
-                                  value={meeting.name}
-                                  onChange={(e) => updateMeeting({ ...meeting, name: e.target.value })}
-                                  onBlur={() => setRenamingMeetingId(null)}
-                                  onKeyDown={(e) => e.key === 'Enter' && setRenamingMeetingId(null)}
-                                  className="bg-cardBg text-textMain px-1 border-b border-emeraldArch outline-none w-full"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                            ) : (
-                                <span className="truncate">{meeting.name}</span>
-                            )}
-                          </div>
-                          <div className="flex space-x-1 opacity-0 group-hover:opacity-100 shrink-0 ml-2">
-                              <button onClick={(e) => { e.stopPropagation(); setRenamingMeetingId(meeting.id); }}><Edit3 size={12} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteMeeting(project.id, meeting.id); }}><Trash2 size={12} /></button>
-                          </div>
+                          <span className="truncate">{meeting.name}</span>
+                          <Trash2 size={12} className="opacity-0 group-hover:opacity-100 hover:text-red-500" onClick={(e) => { e.stopPropagation(); deleteMeeting(project.id, meeting.id); }} />
                         </div>
                       ))}
                       <button 
                         onClick={() => createMeeting(project.id)}
-                        className="flex items-center space-x-2 py-1.5 px-3 rounded-md text-[10px] font-bold uppercase tracking-tighter text-textMuted hover:text-emeraldArch transition-colors w-full text-left"
+                        className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-emeraldArch/60 hover:text-emeraldArch transition-colors"
                       >
-                        <Plus size={12} />
-                        <span>Add Tab Note</span>
+                        + New Tab
                       </button>
                     </div>
                   )}
@@ -294,38 +232,22 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer with Theme Toggle - Fixed Bottom Left */}
-        <div className="p-4 border-t border-borderMain flex items-center justify-between bg-sidebarBg">
-          <div className="text-[9px] font-mono tracking-tighter opacity-40 uppercase">
-            System: <span className="text-emeraldArch">Ready</span>
-          </div>
+        {/* Theme Toggle Footer */}
+        <div className="p-8 flex items-center justify-between">
           <button 
             onClick={toggleTheme}
-            className="p-2.5 bg-appBg border border-borderMain rounded-xl text-textMuted hover:text-emeraldArch hover:border-emeraldArch/50 transition-all shadow-sm flex items-center justify-center"
-            title={theme === 'night' ? "Day Mode" : "Night Mode"}
+            className="nm-btn p-3 rounded-2xl text-textMuted hover:text-emeraldArch transition-all flex items-center justify-center w-full space-x-3 font-bold text-xs"
           >
-            {theme === 'night' ? <Sun size={16} /> : <Moon size={16} />}
+            {theme === 'night' ? <><Sun size={16} /><span>Day View</span></> : <><Moon size={16} /><span>Night View</span></>}
           </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-appBg relative transition-colors duration-300">
+      {/* Main Area */}
+      <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         {!sidebarOpen && (
-            <div className="absolute top-6 left-6 z-20 flex flex-col space-y-4">
-              <button 
-                  onClick={() => setSidebarOpen(true)}
-                  className="p-2.5 bg-sidebarBg text-emeraldArch border border-borderMain rounded-xl hover:bg-appBg transition-colors shadow-2xl"
-                  title="Open Navigator"
-              >
-                  <Menu size={20} />
-              </button>
-              <button 
-                onClick={toggleTheme}
-                className="p-2.5 bg-sidebarBg text-textMain border border-borderMain rounded-xl hover:text-emeraldArch transition-colors shadow-2xl flex items-center justify-center"
-              >
-                {theme === 'night' ? <Sun size={20} /> : <Moon size={20} />}
-              </button>
+            <div className="absolute top-8 left-8 z-40 flex flex-col space-y-4">
+              <button onClick={() => setSidebarOpen(true)} className="nm-btn p-3 rounded-2xl text-emeraldArch"><Menu size={20} /></button>
             </div>
         )}
 
@@ -336,58 +258,37 @@ const App: React.FC = () => {
             onClose={closeActiveMeeting}
           />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 md:p-12 text-center bg-appBg overflow-y-auto">
-            <div className="w-24 h-24 bg-sidebarBg border border-emeraldArch/20 rounded-3xl flex items-center justify-center text-emeraldArch mb-6 rotate-3 shadow-2xl">
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center overflow-y-auto">
+            <div className="w-32 h-32 nm-raised rounded-[40px] flex items-center justify-center text-emeraldArch mb-8 rotate-3">
                 <FileText size={48} />
             </div>
-            <h2 className="text-4xl font-black text-textMain mb-2 tracking-tight">Project Dashboard</h2>
-            <p className="text-textMuted max-w-md mb-10 text-sm leading-relaxed">
-              Open a meeting tab from the navigator to continue your design log or start a new architectural session.
+            <h2 className="text-4xl font-black text-textMain mb-4 tracking-tighter uppercase">Workbench Empty</h2>
+            <p className="text-textMuted max-w-sm mb-12 text-sm font-medium leading-relaxed">
+                Select an architectural log from the navigator or initialize a new design session.
             </p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-lg mb-12">
-                <button 
-                    onClick={createGroup}
-                    className="flex flex-col items-center justify-center space-y-3 p-6 bg-sidebarBg text-textMain border border-borderMain rounded-2xl hover:border-emeraldArch/50 hover:bg-cardBg transition-all group"
-                >
-                    <div className="p-3 bg-appBg rounded-xl group-hover:text-emeraldArch transition-colors"><Folder size={24} /></div>
-                    <span className="font-bold text-sm">New Group</span>
-                </button>
-                <button 
-                    onClick={() => activeProjectId ? createMeeting(activeProjectId) : createGroup()}
-                    className="flex flex-col items-center justify-center space-y-3 p-6 bg-emeraldArch text-black rounded-2xl hover:scale-[1.02] transition-all shadow-lg shadow-emeraldArch/10"
-                >
-                    <div className="p-3 bg-black/10 rounded-xl"><Plus size={24} /></div>
-                    <span className="font-black text-sm">New Meeting Tab</span>
-                </button>
+            <div className="flex space-x-6">
+                <button onClick={createGroup} className="nm-btn px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:text-emeraldArch transition-colors">New Group</button>
+                <button onClick={() => activeProjectId ? createMeeting(activeProjectId) : createGroup()} className="nm-emerald px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-transform hover:scale-105 active:scale-95">Quick Start</button>
             </div>
-
+            
             {recentMeetings.length > 0 && (
-                <div className="w-full max-w-3xl">
-                    <div className="flex items-center space-x-2 px-4 mb-4">
+                <div className="w-full max-w-2xl mt-20">
+                    <div className="flex items-center space-x-3 mb-6">
                         <History size={16} className="text-emeraldArch" />
-                        <h3 className="text-xs font-black uppercase tracking-widest text-textMuted">Reopen Recent Tabs</h3>
+                        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-textMuted">Recently Drafted</h3>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-6">
                         {recentMeetings.map(m => (
                             <button 
                                 key={m.id}
-                                onClick={() => {
-                                    setActiveProjectId(m.projectId);
-                                    setActiveMeetingId(m.id);
-                                    if (!expandedProjectIds.includes(m.projectId)) {
-                                        setExpandedProjectIds(prev => [...prev, m.projectId]);
-                                    }
-                                }}
-                                className="flex items-center justify-between p-4 bg-sidebarBg border border-borderMain rounded-xl hover:border-emeraldArch/30 transition-all text-left group"
+                                onClick={() => { setActiveProjectId(m.projectId); setActiveMeetingId(m.id); }}
+                                className="nm-btn p-6 rounded-3xl text-left group transition-all hover:scale-[1.02]"
                             >
-                                <div className="min-w-0">
-                                    <div className="text-sm font-bold text-textMain truncate group-hover:text-emeraldArch transition-colors">{m.name}</div>
-                                    <div className="text-[10px] text-textMuted mt-1">
-                                        {projects.find(p => p.id === m.projectId)?.name} • {new Date(m.dateCreated).toLocaleDateString()}
-                                    </div>
+                                <div className="text-sm font-black text-textMain truncate mb-1">{m.name}</div>
+                                <div className="text-[10px] text-textMuted font-bold uppercase tracking-widest">
+                                    {projects.find(p => p.id === m.projectId)?.name}
                                 </div>
-                                <ChevronRight size={16} className="text-textMuted group-hover:translate-x-1 transition-transform" />
                             </button>
                         ))}
                     </div>

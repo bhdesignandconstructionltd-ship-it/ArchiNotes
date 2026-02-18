@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
           theme: {
@@ -22,7 +22,6 @@
                 textMain: 'var(--text-main)',
                 textMuted: 'var(--text-muted)',
                 borderMain: 'var(--border-main)',
-                blackBase: 'var(--app-bg)', // Keep compatibility with existing code
               },
               fontFamily: {
                 sans: ['Inter', 'sans-serif'],
@@ -34,23 +33,34 @@
     </script>
     <style>
         :root {
-            /* Night Mode (Default) */
+            /* Night Mode Neumorphism */
             --app-bg: #282828;
-            --sidebar-bg: #1e1e1e;
-            --card-bg: #333333;
+            --sidebar-bg: #282828;
+            --card-bg: #282828;
             --text-main: #e5e5e5;
-            --text-muted: #a3a3a3;
-            --border-main: #404040;
-            transition: all 0.25s ease-in-out;
+            --text-muted: #888888;
+            --border-main: transparent;
+            
+            --nm-shadow-dark: 8px 8px 16px #1a1a1a;
+            --nm-shadow-light: -8px -8px 16px #363636;
+            --nm-inset-dark: inset 4px 4px 8px #1a1a1a;
+            --nm-inset-light: inset -4px -4px 8px #363636;
+            
+            transition: background-color 0.4s ease, color 0.4s ease;
         }
 
         [data-theme='day'] {
+            /* Day Mode Neumorphism */
             --app-bg: #F5F5F5;
-            --sidebar-bg: #ffffff;
-            --card-bg: #ffffff;
-            --text-main: #1a1a1a;
-            --text-muted: #666666;
-            --border-main: #e0e0e0;
+            --sidebar-bg: #F5F5F5;
+            --card-bg: #F5F5F5;
+            --text-main: #2d3436;
+            --text-muted: #636e72;
+            
+            --nm-shadow-dark: 8px 8px 16px #d1d1d1;
+            --nm-shadow-light: -8px -8px 16px #ffffff;
+            --nm-inset-dark: inset 4px 4px 8px #d1d1d1;
+            --nm-inset-light: inset -4px -4px 8px #ffffff;
         }
 
         body {
@@ -58,24 +68,49 @@
             background-color: var(--app-bg);
             color: var(--text-main);
         }
-        .mono { font-family: 'JetBrains+Mono', monospace; }
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+
+        /* Neumorphic Utility Classes */
+        .nm-raised {
+            background: var(--app-bg);
+            box-shadow: var(--nm-shadow-dark), var(--nm-shadow-light);
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        
+        .nm-inset {
+            background: var(--app-bg);
+            box-shadow: var(--nm-inset-dark), var(--nm-inset-light);
+        }
+
+        .nm-flat {
+            background: var(--app-bg);
+        }
+
+        .nm-btn {
+            background: var(--app-bg);
+            box-shadow: var(--nm-shadow-dark), var(--nm-shadow-light);
+            transition: all 0.2s ease;
+        }
+        
+        .nm-btn:active {
+            box-shadow: var(--nm-inset-dark), var(--nm-inset-light);
+            transform: scale(0.98);
+        }
+
+        .nm-btn-active {
+            box-shadow: var(--nm-inset-dark), var(--nm-inset-light) !important;
+        }
+
+        .nm-emerald {
+            background: #50C878;
+            box-shadow: 4px 4px 8px rgba(0,0,0,0.1), -4px -4px 8px rgba(255,255,255,0.1);
+            color: #000;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
         }
         ::-webkit-scrollbar-thumb {
-            background: var(--border-main);
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #50C878;
-        }
-        .pdf-export-mode * {
-          border-color: #e5e7eb !important;
-          color: #000 !important;
+            background: var(--text-muted);
+            border-radius: 10px;
         }
     </style>
 <script type="importmap">
