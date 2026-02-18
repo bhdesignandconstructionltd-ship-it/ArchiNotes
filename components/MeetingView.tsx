@@ -34,7 +34,8 @@ import {
   RotateCcw,
   CheckSquare,
   Square,
-  Circle
+  Circle,
+  PlusCircle
 } from 'lucide-react';
 import DrawingCanvas from './DrawingCanvas';
 
@@ -54,14 +55,13 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
   const [whiteboardColor, setWhiteboardColor] = useState<ToolColor>('#ef4444');
   const [isDrawingWhiteboard, setIsDrawingWhiteboard] = useState(false);
   const [currentWhiteboardPath, setCurrentWhiteboardPath] = useState<{ x: number, y: number }[]>([]);
-  const [attendeesExpanded, setAttendeesExpanded] = useState(false);
+  const [attendeesExpanded, setAttendeesExpanded] = useState(true);
   const [attendeesVisible, setAttendeesVisible] = useState(true);
   const [whiteboardSize, setWhiteboardSize] = useState({ width: 1600, height: 900 });
   const [whiteboardScale, setWhiteboardScale] = useState(1);
   const [redoStack, setRedoStack] = useState<MarkupPath[]>([]);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   
-  // Export States
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [exportOptions, setExportOptions] = useState({
@@ -79,22 +79,21 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
   const groupedAttendees = useMemo(() => {
     const groups: Record<string, Attendee[]> = {};
     (meeting.attendees || []).forEach(att => {
-      const org = att.organisation?.trim() || 'Independent';
+      const org = att.organisation?.trim() || 'Organisation 1';
       if (!groups[org]) groups[org] = [];
       groups[org].push(att);
     });
     return groups;
   }, [meeting.attendees]);
 
-  // Utility to convert PDF to Image
   const processPdfFile = async (file: File): Promise<string> => {
     const pdfjsLib = (window as any).pdfjsLib;
     if (!pdfjsLib) throw new Error('PDF.js not loaded');
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const page = await pdf.getPage(1); // Process first page as background
-    const viewport = page.getViewport({ scale: 2.5 }); // High res for architectural clarity
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 2.5 });
     
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -131,13 +130,12 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
       }
     } catch (error) {
       console.error('File processing failed:', error);
-      alert('Failed to process file. Ensure it is a valid Image or PDF.');
+      alert('Failed to process file.');
     } finally {
       setIsProcessingFile(false);
     }
   };
 
-  // Handle Shift+Ctrl+Scroll for zooming
   useEffect(() => {
     const container = whiteboardContainerRef.current;
     if (!container) return;
@@ -328,7 +326,31 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
     link.click();
   };
 
-  // Simplified PDF Export Logic to match Screenshot
+  const addAttendee = (orgName?: string) => {
+    const uniqueOrgs = Array.from(new Set((meeting.attendees || []).map(a => a.organisation?.trim() || 'Organisation 1')));
+    const nextOrgNum = uniqueOrgs.length + 1;
+    const defaultOrg = orgName || (uniqueOrgs.length > 0 ? uniqueOrgs[uniqueOrgs.length - 1] : `Organisation ${nextOrgNum}`);
+    const newAttendee: Attendee = { id: crypto.randomUUID(), name: '', organisation: defaultOrg };
+    onUpdate({ ...meeting, attendees: [...(meeting.attendees || []), newAttendee] });
+    setAttendeesExpanded(true);
+  };
+
+  const addOrganisation = () => {
+    const uniqueOrgs = Array.from(new Set((meeting.attendees || []).map(a => a.organisation?.trim() || '')));
+    const nextOrgNum = uniqueOrgs.length + 1;
+    const newOrgName = `ORGANISATION ${nextOrgNum}`;
+    const newAttendee: Attendee = { id: crypto.randomUUID(), name: '', organisation: newOrgName };
+    onUpdate({ ...meeting, attendees: [...(meeting.attendees || []), newAttendee] });
+    setAttendeesExpanded(true);
+  };
+
+  const updateOrganisationName = (oldName: string, newName: string) => {
+    const updated = (meeting.attendees || []).map(a => 
+      a.organisation === oldName ? { ...a, organisation: newName } : a
+    );
+    onUpdate({ ...meeting, attendees: updated });
+  };
+
   const handleExportPdf = async () => {
     setIsGeneratingPdf(true);
     try {
@@ -346,8 +368,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
         doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
       };
 
-      // 1. Emerald Header Bar
-      doc.setFillColor(80, 200, 120); // emeraldArch
+      doc.setFillColor(80, 200, 120); 
       doc.rect(0, 0, pageWidth, 20, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
@@ -355,40 +376,32 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
       doc.text("ARCHINOTES: DESIGN MEETING LOG", margin, 13);
       
       currentY = 35;
-
-      // 2. Meeting Title
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
       doc.setTextColor(40);
       doc.text(meeting.name.toUpperCase(), margin, currentY);
       currentY += 8;
-
-      // 3. Date Metadata
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(100);
       doc.text(`DATE: ${new Date(meeting.dateCreated).toLocaleDateString()}`, margin, currentY);
       currentY += 12;
 
-      // 4. Section: Stakeholders (if selected)
       if (exportOptions.attendees && meeting.attendees?.length > 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(11);
         doc.setTextColor(80);
         doc.text("STAKEHOLDERS", margin, currentY);
         currentY += 6;
-        
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(60);
-        
-        const attendeeText = meeting.attendees.map(a => `${a.name} (${a.organisation || 'N/A'})`).join(', ');
+        const attendeeText = meeting.attendees.map(a => `${a.name || 'Anonymous'} (${a.organisation || 'N/A'})`).join(', ');
         const lines = doc.splitTextToSize(attendeeText, pageWidth - margin * 2);
         doc.text(lines, margin, currentY);
         currentY += (lines.length * 5) + 10;
       }
 
-      // 5. Section Heading: Minutes
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(80);
@@ -398,7 +411,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
       doc.line(margin, currentY, pageWidth - margin, currentY);
       currentY += 10;
 
-      // 6. Entries (if selected)
       if (exportOptions.entries) {
         meeting.rows.forEach((row, idx) => {
           if (currentY > pageHeight - 40) {
@@ -429,7 +441,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
         });
       }
 
-      // 7. Whiteboard (if selected)
       if (exportOptions.whiteboard && (meeting.whiteboardImage || (meeting.whiteboardMarkup && meeting.whiteboardMarkup.length > 0))) {
         doc.addPage();
         currentY = margin;
@@ -456,7 +467,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
       doc.save(`ArchiNote_${meeting.name.replace(/\s+/g, '_')}.pdf`);
     } catch (error) {
       console.error('PDF Generation Failed:', error);
-      alert('Could not generate PDF. Please try again.');
+      alert('Could not generate PDF.');
     } finally {
       setIsGeneratingPdf(false);
       setIsExportModalOpen(false);
@@ -465,7 +476,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
 
   return (
     <div className="flex-1 flex flex-col h-full bg-appBg overflow-hidden relative">
-      {/* Fixed Sticky Header for main actions */}
       <div className="px-8 py-6 flex-shrink-0 z-30 bg-appBg/95 backdrop-blur-md">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex items-center space-x-6 flex-1 min-w-0">
@@ -496,53 +506,89 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
         </div>
       </div>
 
-      {/* Main scrollable area containing Attendees, Whiteboard, and Entries */}
       <div id="workspace-scroll" className="flex-1 overflow-auto p-8 pt-2 space-y-8 scrollbar-hide">
         <div className="max-w-7xl mx-auto space-y-8">
           
           <div id="pdf-section-attendees">
           {attendeesVisible && (
               <div className="nm-raised rounded-3xl mb-0 overflow-hidden">
-                <div className="flex items-center justify-between p-4">
+                <div className="flex items-center justify-between p-4 px-6 border-b border-textMuted/5">
                   <button onClick={() => setAttendeesExpanded(!attendeesExpanded)} className="flex items-center space-x-4">
                     <div className={`p-2 nm-inset rounded-xl text-emeraldArch transition-transform ${attendeesExpanded ? 'rotate-180' : ''}`}><ChevronDown size={14} /></div>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Stakeholders & Attendees</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-textMuted">Stakeholders & Attendees</span>
                   </button>
                   <div className="flex items-center space-x-3">
-                      <button onClick={() => {
-                          const newAttendee: Attendee = { id: crypto.randomUUID(), name: '', organisation: '' };
-                          onUpdate({ ...meeting, attendees: [...(meeting.attendees || []), newAttendee] });
-                          setAttendeesExpanded(true);
-                      }} className="nm-btn p-2 rounded-xl text-emeraldArch"><UserPlus size={14} /></button>
+                      <button 
+                        onClick={addOrganisation} 
+                        className="nm-btn px-3 py-1.5 rounded-xl text-emeraldArch flex items-center space-x-2"
+                      >
+                        <Plus size={12} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Add Org</span>
+                      </button>
+                      <button 
+                        onClick={() => addAttendee()} 
+                        className="nm-btn p-2 rounded-xl text-emeraldArch" 
+                      >
+                        <UserPlus size={14} />
+                      </button>
                       <button onClick={() => setAttendeesVisible(false)} className="nm-btn p-2 rounded-xl text-textMuted"><X size={14} /></button>
                   </div>
                 </div>
 
                 {attendeesExpanded && (
-                  <div className="px-6 pb-6 space-y-4">
-                      {Object.entries(groupedAttendees).map(([org, atts]) => (
-                        <div key={org} className="nm-inset p-4 rounded-2xl space-y-4">
-                          <div className="flex items-center justify-between border-b border-textMuted/10 pb-1">
-                             <span className="text-[9px] font-black uppercase tracking-[0.2em] text-emeraldArch">{org}</span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {(atts as Attendee[]).map((att) => (
-                              <div key={att.id} className="nm-raised px-3 py-1.5 rounded-xl flex items-center group">
-                                <input 
-                                  value={att.name}
-                                  onChange={(e) => {
-                                      const updated = (meeting.attendees || []).map(a => a.id === att.id ? { ...a, name: e.target.value } : a);
-                                      onUpdate({ ...meeting, attendees: updated });
-                                  }}
-                                  className="text-[11px] font-bold bg-transparent border-none focus:outline-none w-20"
-                                  placeholder="Name..."
-                                />
-                                <X size={8} className="text-textMuted hover:text-red-500 cursor-pointer ml-2" onClick={() => onUpdate({ ...meeting, attendees: (meeting.attendees || []).filter(a => a.id !== att.id) })} />
+                  <div className="p-6 space-y-6">
+                      {Object.entries(groupedAttendees).length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {Object.entries(groupedAttendees).map(([org, atts], idx) => (
+                            <div key={`org-group-${idx}`} className="nm-inset p-5 rounded-[24px] space-y-4 relative group/org">
+                              <div className="flex items-center justify-between border-b border-textMuted/10 pb-2 mb-2">
+                                <div className="flex items-center space-x-3 flex-1">
+                                  <Building2 size={12} className="text-emeraldArch/50" />
+                                  <input 
+                                      value={org}
+                                      onChange={(e) => updateOrganisationName(org, e.target.value)}
+                                      className="text-[10px] font-black uppercase tracking-[0.2em] text-emeraldArch bg-transparent border-none focus:outline-none w-full"
+                                      placeholder="Organisation Name..."
+                                  />
+                                </div>
+                                <button 
+                                  onClick={() => addAttendee(org)}
+                                  className="nm-btn p-1.5 rounded-lg text-emeraldArch/70 hover:text-emeraldArch"
+                                >
+                                  <Plus size={12} />
+                                </button>
                               </div>
-                            ))}
-                          </div>
+                              <div className="flex flex-col space-y-2">
+                                {(atts as Attendee[]).map((att) => (
+                                  <div key={att.id} className="nm-raised px-4 py-2 rounded-xl flex items-center justify-between group/att hover:nm-inset transition-all">
+                                    <input 
+                                      value={att.name}
+                                      onChange={(e) => {
+                                          const updated = (meeting.attendees || []).map(a => a.id === att.id ? { ...a, name: e.target.value } : a);
+                                          onUpdate({ ...meeting, attendees: updated });
+                                      }}
+                                      className="text-[11px] font-bold bg-transparent border-none focus:outline-none w-full placeholder:text-textMuted/30 focus:text-emeraldArch"
+                                      placeholder="Full Name..."
+                                    />
+                                    <button 
+                                      onClick={() => onUpdate({ ...meeting, attendees: (meeting.attendees || []).filter(a => a.id !== att.id) })}
+                                      className="opacity-0 group-hover/att:opacity-100 transition-opacity p-1 text-textMuted hover:text-red-500"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      ) : (
+                        <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-textMuted/10 rounded-3xl">
+                            <Users size={32} className="text-textMuted/20 mb-4" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-textMuted/40 mb-6">No stakeholders listed</p>
+                            <button onClick={addOrganisation} className="nm-emerald px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em]">Start Roster</button>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
@@ -572,25 +618,21 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
                       ))}
                   </div>
                   <div className="w-px h-4 bg-textMuted/20 mx-1" />
-                  <button onClick={() => setWhiteboardTool(ToolType.HIGHLIGHTER)} className={`nm-btn p-2 rounded-xl transition-all ${whiteboardTool === ToolType.HIGHLIGHTER ? 'nm-btn-active text-yellow-500' : 'text-textMuted'}`} title="Highlighter"><Highlighter size={16} /></button>
-                  <button onClick={() => setWhiteboardTool(ToolType.ERASER)} className={`nm-btn p-2 rounded-xl transition-all ${whiteboardTool === ToolType.ERASER ? 'nm-btn-active text-red-500' : 'text-textMuted'}`} title="Eraser"><Eraser size={16} /></button>
+                  <button onClick={() => setWhiteboardTool(ToolType.HIGHLIGHTER)} className={`nm-btn p-2 rounded-xl transition-all ${whiteboardTool === ToolType.HIGHLIGHTER ? 'nm-btn-active text-yellow-500' : 'text-textMuted'}`}><Highlighter size={16} /></button>
+                  <button onClick={() => setWhiteboardTool(ToolType.ERASER)} className={`nm-btn p-2 rounded-xl transition-all ${whiteboardTool === ToolType.ERASER ? 'nm-btn-active text-red-500' : 'text-textMuted'}`}><Eraser size={16} /></button>
                   <div className="w-px h-4 bg-textMuted/20 mx-1" />
-                  <button onClick={undoWhiteboard} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch" title="Undo"><Undo size={16} /></button>
-                  <button onClick={redoWhiteboard} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch" title="Redo"><Redo size={16} /></button>
+                  <button onClick={undoWhiteboard} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch"><Undo size={16} /></button>
+                  <button onClick={redoWhiteboard} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch"><Redo size={16} /></button>
                   <div className="w-px h-4 bg-textMuted/20 mx-1" />
-                  <button onClick={() => whiteboardImageInputRef.current?.click()} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch" title="Import Plan (IMG/PDF)"><FileUp size={16} /></button>
-                  <button onClick={downloadWhiteboard} className="nm-btn p-2 rounded-xl text-emeraldArch hover:text-emeraldArch" title="Download Scratchpad"><Download size={16} /></button>
+                  <button onClick={() => whiteboardImageInputRef.current?.click()} className="nm-btn p-2 rounded-xl text-textMuted hover:text-emeraldArch"><FileUp size={16} /></button>
+                  <button onClick={downloadWhiteboard} className="nm-btn p-2 rounded-xl text-emeraldArch hover:text-emeraldArch"><Download size={16} /></button>
               </div>
             </div>
             
             <div 
               ref={whiteboardContainerRef}
               className="nm-inset m-4 rounded-2xl overflow-hidden bg-black/5 relative cursor-crosshair flex items-center justify-center transition-all duration-300" 
-              style={{ 
-                height: 'auto',
-                minHeight: '400px',
-                // Removed forced maxHeight to allow tall architectural plans to grow and the user to scroll past them
-              }}
+              style={{ minHeight: '400px' }}
             >
                <canvas 
                   ref={whiteboardCanvasRef} 
@@ -600,8 +642,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
                   style={{ 
                       transform: `scale(${whiteboardScale})`, 
                       transformOrigin: 'center center',
-                      transition: 'transform 0.1s ease-out',
-                      imageRendering: 'pixelated'
+                      transition: 'transform 0.1s ease-out'
                   }}
                   onMouseDown={startWhiteboardDrawing}
                   onMouseMove={(e) => {
@@ -623,7 +664,7 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
                  <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px] flex items-center justify-center z-50">
                     <div className="nm-raised p-6 rounded-3xl flex items-center space-x-4">
                        <Loader2 size={24} className="animate-spin text-emeraldArch" />
-                       <span className="text-xs font-black uppercase tracking-widest">Rendering PDF Layout...</span>
+                       <span className="text-xs font-black uppercase tracking-widest">Rendering PDF...</span>
                     </div>
                  </div>
                )}
@@ -643,10 +684,9 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
                         value={row.discussion}
                         onChange={(e) => updateRow(row.id, 'discussion', e.target.value)}
                         onPaste={(e) => handlePasteImage(e, row.id)}
-                        placeholder="Session notes... (Paste images Ctrl+V)"
+                        placeholder="Session notes..."
                         className="w-full bg-transparent resize-none focus:outline-none text-sm leading-relaxed font-medium flex-1 mb-4 scrollbar-hide"
                       />
-                      
                       <div className="flex items-center space-x-4 overflow-x-auto pb-2 scrollbar-hide">
                           {row.images.map(img => (
                              <div key={img.id} className="relative nm-raised p-1 rounded-xl flex-shrink-0 group/img">
@@ -679,13 +719,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
                 </div>
               </div>
             ))}
-            
-            {meeting.rows.length === 0 && (
-              <div className="nm-raised rounded-[40px] p-20 text-center">
-                  <p className="text-textMuted font-black uppercase tracking-[0.2em] text-xs">No entries in this log</p>
-                  <button onClick={addRow} className="mt-8 nm-emerald px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest">Initialize First Point</button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -696,7 +729,6 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
         </button>
       </div>
 
-      {/* Export Modal */}
       {isExportModalOpen && (
         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="nm-raised w-full max-w-md rounded-[40px] p-8 space-y-8">
@@ -704,106 +736,34 @@ const MeetingView: React.FC<MeetingViewProps> = ({ meeting, onUpdate, onClose })
               <h3 className="text-xl font-black uppercase tracking-tight">Export Preferences</h3>
               <button onClick={() => setIsExportModalOpen(false)} className="nm-btn p-2 rounded-xl text-textMuted"><X size={18} /></button>
             </div>
-            
-            <p className="text-xs font-bold text-textMuted leading-relaxed">
-              Select the components to include in the architectural session report. High-fidelity rendering will be used for drawings.
-            </p>
-            
+            <p className="text-xs font-bold text-textMuted leading-relaxed">Select components for PDF report.</p>
             <div className="space-y-4">
-               <button 
-                onClick={() => setExportOptions(prev => ({ ...prev, attendees: !prev.attendees }))}
-                className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all ${exportOptions.attendees ? 'nm-inset border border-emeraldArch/30' : 'nm-btn'}`}
-               >
-                 <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-xl ${exportOptions.attendees ? 'bg-emeraldArch/10 text-emeraldArch' : 'text-textMuted'}`}><Users size={18} /></div>
-                    <span className="text-xs font-black uppercase tracking-widest">Stakeholders & Attendees</span>
-                 </div>
+               <button onClick={() => setExportOptions(prev => ({ ...prev, attendees: !prev.attendees }))} className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all ${exportOptions.attendees ? 'nm-inset border border-emeraldArch/30' : 'nm-btn'}`}>
+                 <span className="text-xs font-black uppercase tracking-widest">Stakeholders</span>
                  {exportOptions.attendees ? <CheckSquare size={18} className="text-emeraldArch" /> : <Square size={18} className="text-textMuted" />}
                </button>
-
-               <button 
-                onClick={() => setExportOptions(prev => ({ ...prev, whiteboard: !prev.whiteboard }))}
-                className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all ${exportOptions.whiteboard ? 'nm-inset border border-emeraldArch/30' : 'nm-btn'}`}
-               >
-                 <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-xl ${exportOptions.whiteboard ? 'bg-emeraldArch/10 text-emeraldArch' : 'text-textMuted'}`}><PenTool size={18} /></div>
-                    <span className="text-xs font-black uppercase tracking-widest">Project Scratchpad</span>
-                 </div>
+               <button onClick={() => setExportOptions(prev => ({ ...prev, whiteboard: !prev.whiteboard }))} className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all ${exportOptions.whiteboard ? 'nm-inset border border-emeraldArch/30' : 'nm-btn'}`}>
+                 <span className="text-xs font-black uppercase tracking-widest">Scratchpad</span>
                  {exportOptions.whiteboard ? <CheckSquare size={18} className="text-emeraldArch" /> : <Square size={18} className="text-textMuted" />}
                </button>
-
-               <button 
-                onClick={() => setExportOptions(prev => ({ ...prev, entries: !prev.entries }))}
-                className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all ${exportOptions.entries ? 'nm-inset border border-emeraldArch/30' : 'nm-btn'}`}
-               >
-                 <div className="flex items-center space-x-4">
-                    <div className={`p-2 rounded-xl ${exportOptions.entries ? 'bg-emeraldArch/10 text-emeraldArch' : 'text-textMuted'}`}><FileText size={18} /></div>
-                    <span className="text-xs font-black uppercase tracking-widest">Session Log Entries</span>
-                 </div>
+               <button onClick={() => setExportOptions(prev => ({ ...prev, entries: !prev.entries }))} className={`w-full flex items-center justify-between p-5 rounded-2xl transition-all ${exportOptions.entries ? 'nm-inset border border-emeraldArch/30' : 'nm-btn'}`}>
+                 <span className="text-xs font-black uppercase tracking-widest">Log Entries</span>
                  {exportOptions.entries ? <CheckSquare size={18} className="text-emeraldArch" /> : <Square size={18} className="text-textMuted" />}
                </button>
             </div>
-            
-            <button 
-                disabled={isGeneratingPdf || (!exportOptions.attendees && !exportOptions.whiteboard && !exportOptions.entries)}
-                onClick={handleExportPdf}
-                className="w-full nm-emerald py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center space-x-3 disabled:opacity-50"
-            >
+            <button disabled={isGeneratingPdf} onClick={handleExportPdf} className="w-full nm-emerald py-5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center space-x-3 disabled:opacity-50">
               {isGeneratingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-              <span>{isGeneratingPdf ? 'Compiling Report...' : 'Generate Simplified PDF'}</span>
+              <span>{isGeneratingPdf ? 'Exporting...' : 'Generate PDF'}</span>
             </button>
           </div>
         </div>
       )}
 
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        className="hidden" 
-        accept="image/*,application/pdf" 
-        onChange={(e) => { 
-            const file = e.target.files?.[0];
-            if (file && activeRowId.current) {
-                handleFileUpload(file, 'row', activeRowId.current);
-                e.target.value = ''; // Reset input
-            }
-        }} 
-      />
-
-      <input 
-        type="file" 
-        ref={whiteboardImageInputRef} 
-        className="hidden" 
-        accept="image/*,application/pdf" 
-        onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-                handleFileUpload(file, 'whiteboard');
-                e.target.value = ''; // Reset input
-            }
-        }} 
-      />
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,application/pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file && activeRowId.current) { handleFileUpload(file, 'row', activeRowId.current); e.target.value = ''; } }} />
+      <input type="file" ref={whiteboardImageInputRef} className="hidden" accept="image/*,application/pdf" onChange={(e) => { const file = e.target.files?.[0]; if (file) { handleFileUpload(file, 'whiteboard'); e.target.value = ''; } }} />
 
       {editingMarkup && (
-        <DrawingCanvas 
-            imageUrl={editingMarkup.url} 
-            initialMarkup={editingMarkup.markup} 
-            onCancel={() => setEditingMarkup(null)} 
-            onSave={(markup) => {
-                const { rowId, imageId } = editingMarkup;
-                const updatedRows = meeting.rows.map(row => {
-                  if (row.id === rowId) {
-                    return {
-                      ...row,
-                      images: row.images.map(img => img.id === imageId ? { ...img, markup } : img)
-                    };
-                  }
-                  return row;
-                });
-                onUpdate({ ...meeting, rows: updatedRows });
-                setEditingMarkup(null);
-            }} 
-        />
+        <DrawingCanvas imageUrl={editingMarkup.url} initialMarkup={editingMarkup.markup} onCancel={() => setEditingMarkup(null)} onSave={(markup) => { const { rowId, imageId } = editingMarkup; const updatedRows = meeting.rows.map(row => row.id === rowId ? { ...row, images: row.images.map(img => img.id === imageId ? { ...img, markup } : img) } : row); onUpdate({ ...meeting, rows: updatedRows }); setEditingMarkup(null); }} />
       )}
     </div>
   );

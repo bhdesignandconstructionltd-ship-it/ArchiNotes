@@ -12,21 +12,21 @@ export const COLORS = {
 export const INITIAL_DATA = [
   {
     id: 'proj-1',
-    name: 'Harbor Residences',
+    name: 'PROJECT TITLE',
     meetings: [
       {
         id: 'meet-1',
-        name: 'Initial Briefing',
+        name: 'MEETING TITLE',
         dateCreated: new Date().toISOString(),
         attendees: [
-          { id: 'att-1', name: 'John Architect', organisation: 'ArchiCore' },
-          { id: 'att-2', name: 'Sarah Client', organisation: 'Marina Dev' }
+          { id: 'att-1', name: 'Lead Architect', organisation: 'Organisation 1' },
+          { id: 'att-2', name: 'Client Representative', organisation: 'Organisation 2' }
         ],
         rows: [
           {
             id: 'row-1',
-            discussion: 'Discussed the site orientation and view corridors.',
-            followUp: 'Engineer to verify soil reports',
+            discussion: 'Welcome to your new architectural log. Start by adding notes, sketching on the scratchpad, or attaching site plans.',
+            followUp: 'First action item goes here',
             images: []
           }
         ],

@@ -20,7 +20,8 @@ import {
   Clock,
   Moon,
   Sun,
-  History
+  History,
+  Check
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -38,7 +39,6 @@ const App: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [theme, setTheme] = useState<'day' | 'night'>(() => {
     const savedTheme = localStorage.getItem('archi_theme');
-    // Default to 'day' if no theme is saved
     return (savedTheme as 'day' | 'night') || 'day';
   });
 
@@ -86,19 +86,20 @@ const App: React.FC = () => {
   const createGroup = () => {
     const newGroup: ProjectGroup = {
       id: crypto.randomUUID(),
-      name: 'New Project Group',
+      name: 'PROJECT TITLE',
       meetings: []
     };
     setProjects(prev => [...prev, newGroup]);
     setActiveProjectId(newGroup.id);
     setExpandedProjectIds(prev => [...prev, newGroup.id]);
+    setRenamingGroupId(newGroup.id);
     setSearchTerm('');
   };
 
   const createMeeting = (projectId: string) => {
     const newMeeting: Meeting = {
       id: crypto.randomUUID(),
-      name: `Meeting - ${new Date().toLocaleDateString()}`,
+      name: `MEETING TITLE`,
       dateCreated: new Date().toISOString(),
       attendees: [],
       rows: []
@@ -108,6 +109,7 @@ const App: React.FC = () => {
     ));
     setActiveMeetingId(newMeeting.id);
     setActiveProjectId(projectId);
+    setRenamingMeetingId(newMeeting.id);
     if (!expandedProjectIds.includes(projectId)) {
       setExpandedProjectIds(prev => [...prev, projectId]);
     }
@@ -118,6 +120,17 @@ const App: React.FC = () => {
     setProjects(prev => prev.map(p => ({
       ...p,
       meetings: p.meetings.map(m => m.id === updatedMeeting.id ? updatedMeeting : m)
+    })));
+  };
+
+  const updateGroupName = (id: string, name: string) => {
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, name } : p));
+  };
+
+  const updateMeetingName = (meetingId: string, name: string) => {
+    setProjects(prev => prev.map(p => ({
+      ...p,
+      meetings: p.meetings.map(m => m.id === meetingId ? { ...m, name } : m)
     })));
   };
 
@@ -192,14 +205,40 @@ const App: React.FC = () => {
                     className={`nm-btn group flex items-center justify-between px-4 py-3 rounded-2xl cursor-pointer ${activeProjectId === project.id ? 'nm-btn-active' : ''}`}
                     onClick={() => {
                         setActiveProjectId(project.id);
-                        toggleProjectExpansion(project.id);
+                        if (renamingGroupId !== project.id) {
+                          toggleProjectExpansion(project.id);
+                        }
                     }}
                   >
                     <div className="flex items-center space-x-3 overflow-hidden flex-1">
                       {expandedProjectIds.includes(project.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      <span className={`truncate text-sm font-bold ${activeProjectId === project.id ? 'text-emeraldArch' : ''}`}>
-                          {project.name}
-                      </span>
+                      {renamingGroupId === project.id ? (
+                        <input 
+                          autoFocus
+                          value={project.name}
+                          onChange={(e) => updateGroupName(project.id, e.target.value)}
+                          onBlur={() => setRenamingGroupId(null)}
+                          onKeyDown={(e) => e.key === 'Enter' && setRenamingGroupId(null)}
+                          className="bg-transparent text-sm font-bold focus:outline-none text-emeraldArch w-full"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span className={`truncate text-sm font-bold ${activeProjectId === project.id ? 'text-emeraldArch' : ''}`}>
+                            {project.name}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Edit3 
+                        size={12} 
+                        className="text-textMuted hover:text-emeraldArch" 
+                        onClick={(e) => { e.stopPropagation(); setRenamingGroupId(project.id); }} 
+                      />
+                      <Trash2 
+                        size={12} 
+                        className="text-textMuted hover:text-red-500" 
+                        onClick={(e) => { e.stopPropagation(); deleteGroup(project.id); }} 
+                      />
                     </div>
                   </div>
                   
@@ -208,14 +247,37 @@ const App: React.FC = () => {
                       {project.meetings.map(meeting => (
                         <div 
                           key={meeting.id}
-                          className={`flex items-center justify-between py-2 px-4 rounded-xl cursor-pointer text-xs font-bold transition-all ${activeMeetingId === meeting.id ? 'nm-inset text-emeraldArch' : 'text-textMuted hover:text-textMain'}`}
+                          className={`flex items-center group justify-between py-2 px-4 rounded-xl cursor-pointer text-xs font-bold transition-all ${activeMeetingId === meeting.id ? 'nm-inset text-emeraldArch' : 'text-textMuted hover:text-textMain'}`}
                           onClick={() => {
                               setActiveMeetingId(meeting.id);
                               setActiveProjectId(project.id);
                           }}
                         >
-                          <span className="truncate">{meeting.name}</span>
-                          <Trash2 size={12} className="opacity-0 group-hover:opacity-100 hover:text-red-500" onClick={(e) => { e.stopPropagation(); deleteMeeting(project.id, meeting.id); }} />
+                          {renamingMeetingId === meeting.id ? (
+                            <input 
+                              autoFocus
+                              value={meeting.name}
+                              onChange={(e) => updateMeetingName(meeting.id, e.target.value)}
+                              onBlur={() => setRenamingMeetingId(null)}
+                              onKeyDown={(e) => e.key === 'Enter' && setRenamingMeetingId(null)}
+                              className="bg-transparent focus:outline-none text-emeraldArch w-full"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="truncate">{meeting.name}</span>
+                          )}
+                          <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                             <Edit3 
+                              size={12} 
+                              className="hover:text-emeraldArch" 
+                              onClick={(e) => { e.stopPropagation(); setRenamingMeetingId(meeting.id); }} 
+                            />
+                             <Trash2 
+                              size={12} 
+                              className="hover:text-red-500" 
+                              onClick={(e) => { e.stopPropagation(); deleteMeeting(project.id, meeting.id); }} 
+                            />
+                          </div>
                         </div>
                       ))}
                       <button 
